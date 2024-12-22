@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .drop-zone {
+            width: calc(100% - 40px);
+            height: auto;
+            min-height: 60px;
+            border: 2px dashed #4a90e2;
+            border-radius: 8px;
+            text-align: center;
+            padding: 15px;
+            margin: 20px auto;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .drop-zone:hover {
+            background: #e9ecef;
+            border-color: #357abd;
+        }
+
+        .drop-zone.dragover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .drop-zone p {
+            margin: 3px 0;
+            font-size: 14px;
+            color: #495057;
+            line-height: 1.4;
+        }
+
+        .nav {
+            text-align: center;
+            margin: 30px 0;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav button {
+            padding: 8px 16px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav button:hover:not(:disabled) {
+            background: #357abd;
+        }
+
+        .nav button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .nav span {
+            font-size: 16px;
+            font-weight: 500;
+            color: #343a40;
+            margin: 0 15px;
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #495057;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .section-title {
+            color: #343a40;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 30px 0 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #4a90e2;
+        }
+
+        .green {
+            color: #28a745;
+        }
+
+        .red {
+            color: #dc3545;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .data-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #assetInfo table {
+            margin-top: 0;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        .value-cell {
+            font-family: monospace;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="drop-zone" id="dropZone">
+        <p>将ZIP文件拖放到此处或点击选择文件上传</p>
+        <input type="file" id="fileInput" accept=".zip" style="display: none;" />
+    </div>
+
+    <div id="dataDisplay" class="hidden">
+        <div class="nav">
+            <button id="prevButton" onclick="prevDate()">前一天</button>
+            <span id="currentDate">2024/12/09/周一</span>
+            <button id="nextButton" onclick="nextDate()">后一天</button>
+        </div>
+        
+        <div id="assetInfo" class="data-section">
+            <table>
+                <tr>
+                    <th>日期</th>
+                    <th>总资产</th>
+                    <th>资金余额</th>
+                    <th>当日持仓</th>
+                    <th>浮动盈亏</th>
+                    <th>当日盈亏</th>
+                    <th>当日买入开仓</th>
+                    <th>当日卖出平仓</th>
+                    <th>手续费</th>
+                </tr>
+                <tr id="assetRow"></tr>
+            </table>
+        </div>
+
+        <div id="positions" class="data-section">
+            <div class="section-title">持仓 (0)</div>
+            <table>
+                <tr>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>方向</th>
+                    <th>数量</th>
+                    <th>当前价</th>
+                    <th>成本价</th>
+                    <th>持仓市值</th>
+                    <th>浮动盈亏</th>
+                </tr>
+                <tbody id="positionBody"></tbody>
+            </table>
+        </div>
+
+        <div id="trades" class="data-section">
+            <div class="section-title">委托 (0)</div>
+            <table>
+                <tr>
+                    <th>委托时间</th>
+                    <th>成交时间</th>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>方向</th>
+                    <th>价格</th>
+                    <th>数量</th>
+                    <th>已成交量</th>
+                    <th>成交均价</th>
+                    <th>手续费</th>
+                </tr>
+                <tbody id="tradeBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let netValueData = null;
+        let tradeData = null;
+        let positionData = null;
+        let currentDateIndex = 0;
+        let dates = [];
+        let stockNameMap = {};
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载股票名称映射
+            fetch('stockNames.json')
+                .then(response => response.json())
+                .then(data => {
+                    stockNameMap = data;
+                })
+                .catch(error => {
+                    console.error('Error loading stock names:', error);
+                });
+
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            // 点击上传区域触发文件选择
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // 阻止默认拖放行为
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            if (file.type !== 'application/zip' && !file.name.endsWith('.zip')) {
+                alert('请上传ZIP文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const zip = new JSZip();
+                    const zipContent = await zip.loadAsync(e.target.result);
+                    
+                    for (const [filename, zipEntry] of Object.entries(zipContent.files)) {
+                        if (!filename.endsWith('.csv')) continue;
+
+                        const content = await zipEntry.async('string');
+                        const fileType = determineFileType(filename);
+                        if (fileType) {
+                            processCSVContent(content, fileType);
+                        }
+                    }
+
+                    // 显示数据区域并更新显示
+                    document.getElementById('dataDisplay').classList.remove('hidden');
+                    updateDisplay();
+                    
+                } catch (error) {
+                    console.error('Error processing ZIP file:', error);
+                    alert('处理ZIP文件时出错');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function determineFileType(filename) {
+            filename = filename.toLowerCase();
+            if (filename.includes('净值数据')) return 'netValue';
+            if (filename.includes('交易数据')) return 'trade';
+            if (filename.includes('持仓数据')) return 'position';
+            return null;
+        }
+
+        function processCSVContent(content, type) {
+            const data = parseCSV(content);
+            switch (type) {
+                case 'netValue':
+                    netValueData = data;
+                    dates = netValueData.map(row => row.date);
+                    break;
+                case 'trade':
+                    tradeData = data;
+                    break;
+                case 'position':
+                    positionData = data;
+                    break;
+            }
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(header => header.trim());
+            const result = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const obj = {};
+                const currentLine = lines[i].split(',');
+
+                for (let j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = currentLine[j] ? currentLine[j].trim() : '';
+                }
+                result.push(obj);
+            }
+
+            return result;
+        }
+
+        function updateDisplay() {
+            if (!dates.length) return;
+            
+            const currentDate = dates[currentDateIndex];
+            document.getElementById('currentDate').textContent = formatDate(currentDate);
+
+            // 更新按钮状态
+            document.getElementById('prevButton').disabled = currentDateIndex === 0;
+            document.getElementById('nextButton').disabled = currentDateIndex === dates.length - 1;
+
+            // 更新资产信息
+            const assetData = netValueData.find(row => row.date === currentDate);
+            if (assetData) {
+                const tradesForDate = tradeData.filter(row => {
+                    const isValidDate = row.trade_time.startsWith(currentDate.split(' ')[0]);
+                    const isValidType = row.btype === '买入开仓' || row.btype === '卖出平仓';
+                    return isValidDate && isValidType;
+                });
+                const positionsForDate = positionData.filter(row => row.date.startsWith(currentDate.split(' ')[0]));
+
+                // 计算当日买入开仓和卖出平仓金额
+                let totalBuyAmount = 0;
+                let totalSellAmount = 0;
+                let totalFee = 0;
+
+                // 计算浮动盈亏和当日盈亏
+                let floatingPL = 0;
+                let dailyPL = parseFloat(assetData.total_asset_value) / (1 + parseFloat(assetData.strategy_yield_daily)) * parseFloat(assetData.strategy_yield_daily);
+                
+                tradesForDate.forEach(trade => {
+                    if (trade.btype === '买入开仓') {
+                        totalBuyAmount += parseFloat(trade.amount);
+                    } else if (trade.btype === '卖出平仓') {
+                        totalSellAmount += parseFloat(trade.amount);
+                    }
+                    totalFee += parseFloat(trade.fee);
+                });
+                
+                positionsForDate.forEach(position => {
+                    floatingPL += (parseFloat(position.price) - parseFloat(position.posi_vwap)) * parseFloat(position.posi_balance);
+                });
+
+                document.getElementById('assetRow').innerHTML = `
+                    <td>${formatDate(assetData.date)}</td>
+                    <td class="value-cell">${parseFloat(assetData.total_asset_value).toFixed(2)}</td>
+                    <td class="value-cell">${parseFloat(assetData.cash_balance).toFixed(2)}</td>
+                    <td class="value-cell">${parseFloat(assetData.total_market_value).toFixed(2)}</td>
+                    <td class="value-cell ${assetData.strategy_yield < 0 ? 'green' : 'red'}">${floatingPL.toFixed(2)}</td>
+                    <td class="value-cell ${assetData.strategy_yield_daily < 0 ? 'green' : 'red'}">${dailyPL.toFixed(2)}</td>
+                    <td class="value-cell">${Math.abs(totalBuyAmount).toFixed(2)}</td>
+                    <td class="value-cell">${totalSellAmount.toFixed(2)}</td>
+                    <td class="value-cell">${totalFee.toFixed(2)}</td>
+                `;
+            }
+
+            // 更新持仓信息
+            if (positionData) {
+                const positionsForDate = positionData.filter(row => row.date.startsWith(currentDate.split(' ')[0]));
+                
+                // 更新标题显示持仓数量
+                document.querySelector('#positions .section-title').textContent = 
+                    `持仓 (${positionsForDate.length})`;
+
+                const positionHTML = positionsForDate.map(pos => {
+                    const pl = calculatePL(pos);
+                    return `
+                        <tr>
+                            <td>${pos.symbol}</td>
+                            <td>${getStockName(pos.symbol)}</td>
+                            <td>${pos.side}</td>
+                            <td class="value-cell">${pos.posi_balance}</td>
+                            <td class="value-cell">${parseFloat(pos.price).toFixed(2)}</td>
+                            <td class="value-cell">${parseFloat(pos.posi_vwap).toFixed(2)}</td>
+                            <td class="value-cell">${parseFloat(pos.market_value).toFixed(2)}</td>
+                            <td class="value-cell ${pl > 0 ? 'red' : 'green'}">${pl}</td>
+                        </tr>
+                    `;
+                }).join('');
+                document.getElementById('positionBody').innerHTML = positionHTML;
+            }
+
+            // 更新交易信息
+            if (tradeData) {
+                const tradesForDate = tradeData.filter(row => {
+                    const isValidDate = row.trade_time.startsWith(currentDate.split(' ')[0]);
+                    const isValidType = row.btype === '买入开仓' || row.btype === '卖出平仓';
+                    return isValidDate && isValidType;
+                });
+
+                // 更新标题显示委托数量
+                document.querySelector('#trades .section-title').textContent = 
+                    `委托 (${tradesForDate.length})`;
+
+                const tradeHTML = tradesForDate.map(trade => `
+                    <tr>
+                        <td>${formatTime(trade.trade_time)}</td>
+                        <td>${formatTime(trade.order_fill_time)}</td>
+                        <td>${trade.symbol}</td>
+                        <td>${getStockName(trade.symbol)}</td>
+                        <td>${trade.btype}</td>
+                        <td class="value-cell">${parseFloat(trade.order_price).toFixed(2)}</td>
+                        <td class="value-cell">${trade.order_volume}</td>
+                        <td class="value-cell">${Math.abs(trade.volume)}</td>
+                        <td class="value-cell">${parseFloat(trade.vwap).toFixed(2)}</td>
+                        <td class="value-cell">${parseFloat(trade.fee).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+                document.getElementById('tradeBody').innerHTML = tradeHTML;
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+        }
+
+        function getStockName(symbol) {
+            return stockNameMap[symbol] || '';
+        }
+
+        function calculatePL(position) {
+            const pl = (parseFloat(position.price) - parseFloat(position.posi_vwap)) * parseFloat(position.posi_balance);
+            return pl.toFixed(2);
+        }
+
+        function prevDate() {
+            if (currentDateIndex > 0) {
+                currentDateIndex--;
+                updateDisplay();
+            }
+        }
+
+        function nextDate() {
+            if (currentDateIndex < dates.length - 1) {
+                currentDateIndex++;
+                updateDisplay();
+            }
+        }
+    </script>
+</body>
+</html>
