@@ -85,6 +85,21 @@
             border-radius: 4px;
         }
 
+        .date-picker {
+            padding: 8px;
+            border: 1px solid #4a90e2;
+            border-radius: 4px;
+            margin: 0 10px;
+            font-size: 14px;
+            color: #495057;
+            background: white;
+            cursor: pointer;
+        }
+
+        .date-picker:hover {
+            border-color: #357abd;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -165,6 +180,7 @@
         <div class="nav">
             <button id="prevButton" onclick="prevDate()">前一天</button>
             <span id="currentDate">2024/12/09/周一</span>
+            <input type="date" id="datePicker" class="date-picker" onchange="selectDate(this.value)">
             <button id="nextButton" onclick="nextDate()">后一天</button>
         </div>
         
@@ -361,6 +377,16 @@
             const currentDate = dates[currentDateIndex];
             document.getElementById('currentDate').textContent = formatDate(currentDate);
 
+            // 更新日期选择器的值范围
+            const datePicker = document.getElementById('datePicker');
+            if (dates.length > 0) {
+                const firstDate = dates[0].split(' ')[0];
+                const lastDate = dates[dates.length - 1].split(' ')[0];
+                datePicker.min = firstDate;
+                datePicker.max = lastDate;
+                datePicker.value = currentDate.split(' ')[0];
+            }
+
             // 更新按钮状态
             document.getElementById('prevButton').disabled = currentDateIndex === 0;
             document.getElementById('nextButton').disabled = currentDateIndex === dates.length - 1;
@@ -499,6 +525,27 @@
                 currentDateIndex++;
                 updateDisplay();
             }
+        }
+
+        function selectDate(selectedDate) {
+            if (!selectedDate || !dates.length) return;
+            
+            // 找到最接近选中日期的数据
+            const targetDate = new Date(selectedDate);
+            let closestIndex = 0;
+            let minDiff = Infinity;
+            
+            dates.forEach((date, index) => {
+                const currentDate = new Date(date.split(' ')[0]);
+                const diff = Math.abs(targetDate - currentDate);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = index;
+                }
+            });
+            
+            currentDateIndex = closestIndex;
+            updateDisplay();
         }
     </script>
 </body>
